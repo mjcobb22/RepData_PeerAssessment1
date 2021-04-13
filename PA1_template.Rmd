@@ -7,19 +7,89 @@ output:
 
 
 ## Loading and preprocessing the data
+```{r setup}
+library(dplyr)
+library(ggplot2)
+library(data.table)
 
+activity<-data.table::fread("./activity.csv")
+
+spd<- aggregate(activity$steps, 
+                list(activity$date),
+                FUN=sum)
+
+colnames(spd)<- c("date","stepsperday")
+```
 
 
 ## What is mean total number of steps taken per day?
 
-
+```{r hist}
+h <- ggplot(spd, aes(stepsperday))
+h+geom_histogram()
+#mode
+cat(paste("\nmean is : ", mean(spd$stepsperday, na.rm = TRUE)))
+#median
+cat(paste("\nmedian is : ", median(spd$stepsperday, na.rm = TRUE)))
+```
 
 ## What is the average daily activity pattern?
 
+```{r time}
+spt<- aggregate(steps~interval,
+               data=activity,
+               FUN=mean,
+               na.acton=na.omit)
 
+colnames(spt)<- c("interval","stepspertime")
+
+t <- ggplot(spt, aes(interval, stepspertime))
+t+geom_line()
+
+spt %>%
+select(interval, stepspertime) %>%
+filter(stepspertime==max(spt$stepspertime))
+```
 
 ## Imputing missing values
 
+```{r}
+print(paste("total NA is : ", activity[is.na(steps), .N ]))
 
+activity[is.na(steps),"steps"]<-activity[,c(lapply(.SD, mean, na.rm = TRUE,)), .SDcols = c("steps")]
+
+#data.table::fwrite(activity,"./activity-fillna-median.csv")
+
+fillactivity<-copy(activity)
+
+tspd<- aggregate(activity$steps, 
+                list(activity$date),
+                FUN=sum)
+
+colnames(tspd)<- c("date","stepsperday")
+
+th <- ggplot(tspd, aes(stepsperday))
+th+geom_histogram()
+
+cat(paste("\nmean is : ", mean(tspd$stepsperday)))
+
+cat(paste("\nmedian is : ", median(tspd$stepsperday)))
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+fillactivity$wkday<-weekdays(fillactivity$date)
+
+fillactivity$wkORwkend<-ifelse(fillactivity$wkday=="Saturday"|fillactivity$wkday=="Sunday","weekend","weekday")
+
+fspt<- aggregate(steps~interval+wkORwkend,
+               data=fillactivity,
+               FUN=mean)
+
+colnames(fspt)<- c("interval","wkORwkend","stepspertime")
+
+ft <- ggplot(fspt, aes(interval, stepspertime))
+ft+geom_line()+facet_wrap(wkORwkend ~ .)
+
+```
